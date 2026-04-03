@@ -9,21 +9,21 @@
         :root {
             --bg: #020617; --card: #0f172a; --cyan: #00f2ff;
             --green: #22c55e; --orange: #f59e0b; --red: #ef4444;
-            --text: #f8fafc; --border: #1e293b;
+            --text: #f8fafc;
         }
-        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; margin: 0; }
+        body { background-color: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; }
         .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; max-width: 900px; margin-top: 20px; }
-        @media (max-width: 700px) { .dashboard { grid-template-columns: 1fr; } }
-        .card { background: var(--card); border: 1px solid var(--border); padding: 25px; border-radius: 16px; text-align: center; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
+        .card { background: var(--card); border: 1px solid #1e293b; padding: 25px; border-radius: 16px; text-align: center; }
         .journal-card { grid-column: 1; text-align: left; min-height: 450px; }
-        .status-section { display: flex; flex-direction: column; gap: 20px; }
-        .label { color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; display: block; }
         .value { font-size: 3.2rem; font-weight: 800; display: block; }
+        
+        /* Culori Status */
         .st-siguranta { color: var(--green); }
         .st-obstacol { color: var(--orange); }
         .st-pericol { color: var(--red); animation: pulse 1s infinite; }
-        .log-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); font-family: 'Courier New', monospace; font-size: 1rem; font-weight: bold; }
-        .badge { background: rgba(0, 242, 255, 0.1); color: var(--cyan); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; }
+
+        .log-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); font-family: 'Courier New', monospace; font-size: 1.1rem; }
+        .badge { background: rgba(0, 242, 255, 0.1); color: var(--cyan); padding: 2px 6px; border-radius: 4px; margin-right: 10px; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
     </style>
 </head>
@@ -33,18 +33,18 @@
 
     <div class="dashboard">
         <div class="card journal-card">
-            <span class="label">Jurnal Activitate Buton (Live)</span>
-            <div id="journal"></div>
+            <span style="color: #64748b; text-transform: uppercase; font-size: 0.8rem;">Jurnal Detecție Buton</span>
+            <div id="journal" style="margin-top: 15px;"></div>
         </div>
 
-        <div class="status-section">
+        <div style="display: flex; flex-direction: column; gap: 20px;">
             <div class="card">
-                <span class="label">Distanță Actuală</span>
+                <span style="color: #64748b; font-size: 0.8rem;">DISTANȚĂ</span>
                 <span id="dist-val" class="value">-- cm</span>
             </div>
             <div class="card">
-                <span class="label">Stare Sistem</span>
-                <span id="status-val" class="value">---</span>
+                <span style="color: #64748b; font-size: 0.8rem;">STARE SISTEM</span>
+                <span id="status-val" class="value" style="font-size: 2.2rem;">---</span>
             </div>
         </div>
     </div>
@@ -54,56 +54,53 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // 1. STATUS LOGIC (PRAGURI NOI)
+        // 1. LOGICA STATUS (CONFORM NOILOR REGULI)
         db.ref('sistem').on('value', (snapshot) => {
             const data = snapshot.val();
             if(!data) return;
 
             const dist = data.distanta;
-            const distDisplay = document.getElementById('dist-val');
-            const st = document.getElementById('status-val');
+            const dv = document.getElementById('dist-val');
+            const sv = document.getElementById('status-val');
             
-            distDisplay.innerText = dist + " cm";
+            dv.innerText = dist + " cm";
 
             if (dist <= 10 && dist > 0) {
-                st.innerText = "PERICOL";
-                st.className = "value st-pericol";
-                distDisplay.className = "value st-pericol";
+                sv.innerText = "PERICOL";
+                sv.className = "value st-pericol";
+                dv.className = "value st-pericol";
             } 
             else if (dist > 10 && dist <= 100) {
-                st.innerText = "OBSTACOL";
-                st.className = "value st-obstacol";
-                distDisplay.className = "value st-obstacol";
+                sv.innerText = "OBSTACOL";
+                sv.className = "value st-obstacol";
+                dv.className = "value st-obstacol";
             } 
             else {
-                st.innerText = "SIGURANȚĂ";
-                st.className = "value st-siguranta";
-                distDisplay.className = "value st-siguranta";
+                sv.innerText = "SIGURANȚĂ";
+                sv.className = "value st-siguranta";
+                dv.className = "value st-siguranta";
             }
         });
 
-        // 2. JURNAL LOGIC (FIX ORA)
-        db.ref('jurnal').limitToLast(10).on('value', (snapshot) => {
-            const journalDiv = document.getElementById('journal');
-            journalDiv.innerHTML = "";
-            const data = snapshot.val();
-            if(!data) return;
+        // 2. LOGICA JURNAL (AFIȘEAZĂ ORA REALĂ A COMPUTERULUI)
+        const journalDiv = document.getElementById('journal');
 
-            const keys = Object.keys(data).reverse();
-            keys.forEach(key => {
-                const entry = data[key];
-                const logItem = document.createElement('div');
-                logItem.className = 'log-item';
-                
-                // Daca "ora" din Firebase e goala, folosim ora curenta
-                const oraFinala = entry.ora ? entry.ora : new Date().toLocaleTimeString('ro-RO', {hour: '2-digit', minute:'2-digit', second:'2-digit'});
-                
-                logItem.innerHTML = `
-                    <span><span class="badge">BUTON</span> APĂSAT</span>
-                    <span style="color: var(--cyan)">${oraFinala}</span>
-                `;
-                journalDiv.appendChild(logItem);
-            });
+        // Ascultăm doar intrările noi pentru a pune ora exactă a recepției
+        db.ref('jurnal').limitToLast(10).on('child_added', (snapshot) => {
+            const now = new Date();
+            const oraLocala = now.getHours().toString().padStart(2, '0') + ":" + 
+                             now.getMinutes().toString().padStart(2, '0') + ":" + 
+                             now.getSeconds().toString().padStart(2, '0');
+
+            const logItem = document.createElement('div');
+            logItem.className = 'log-item';
+            logItem.innerHTML = `
+                <span><span class="badge">BUTON</span> APĂSAT</span>
+                <span style="color: var(--cyan)">${oraLocala}</span>
+            `;
+            
+            // Adăugăm noua intrare la începutul listei
+            journalDiv.insertBefore(logItem, journalDiv.firstChild);
         });
     </script>
 </body>
