@@ -18,12 +18,12 @@
         .journal-card { grid-column: 1; text-align: left; min-height: 450px; }
         .status-section { display: flex; flex-direction: column; gap: 20px; }
         .label { color: #94a3b8; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 10px; display: block; }
-        .value { font-size: 3.5rem; font-weight: 800; display: block; }
+        .value { font-size: 3.2rem; font-weight: 800; display: block; }
         .st-siguranta { color: var(--green); }
         .st-obstacol { color: var(--orange); }
         .st-pericol { color: var(--red); animation: pulse 1s infinite; }
-        .log-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); font-family: monospace; font-size: 0.9rem; }
-        .badge { background: rgba(0, 242, 255, 0.1); color: var(--cyan); padding: 2px 6px; border-radius: 4px; }
+        .log-item { display: flex; justify-content: space-between; padding: 12px; border-bottom: 1px solid rgba(255,255,255,0.05); font-family: 'Courier New', monospace; font-size: 1rem; font-weight: bold; }
+        .badge { background: rgba(0, 242, 255, 0.1); color: var(--cyan); padding: 2px 6px; border-radius: 4px; font-size: 0.8rem; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
     </style>
 </head>
@@ -33,7 +33,7 @@
 
     <div class="dashboard">
         <div class="card journal-card">
-            <span class="label">Jurnal Activitate Buton</span>
+            <span class="label">Jurnal Activitate Buton (Live)</span>
             <div id="journal"></div>
         </div>
 
@@ -54,7 +54,7 @@
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // 1. LOGICA STATUS (CONFORM NOILOR REGULI)
+        // 1. STATUS LOGIC (PRAGURI NOI)
         db.ref('sistem').on('value', (snapshot) => {
             const data = snapshot.val();
             if(!data) return;
@@ -82,28 +82,25 @@
             }
         });
 
-        // 2. LOGICA JURNAL (REPARAT ORA REPETITIVĂ)
+        // 2. JURNAL LOGIC (FIX ORA)
         db.ref('jurnal').limitToLast(10).on('value', (snapshot) => {
             const journalDiv = document.getElementById('journal');
             journalDiv.innerHTML = "";
             const data = snapshot.val();
-            
             if(!data) return;
 
-            // Inversăm ordinea pentru a avea cele mai noi sus
             const keys = Object.keys(data).reverse();
-            
             keys.forEach(key => {
                 const entry = data[key];
                 const logItem = document.createElement('div');
                 logItem.className = 'log-item';
                 
-                // Dacă Arduino trimite ora, o folosim. Dacă nu, punem o notă.
-                const oraInregistrata = entry.ora || "--:--:--";
+                // Daca "ora" din Firebase e goala, folosim ora curenta
+                const oraFinala = entry.ora ? entry.ora : new Date().toLocaleTimeString('ro-RO', {hour: '2-digit', minute:'2-digit', second:'2-digit'});
                 
                 logItem.innerHTML = `
                     <span><span class="badge">BUTON</span> APĂSAT</span>
-                    <span style="color: var(--cyan)">${oraInregistrata}</span>
+                    <span style="color: var(--cyan)">${oraFinala}</span>
                 `;
                 journalDiv.appendChild(logItem);
             });
