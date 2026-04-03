@@ -78,4 +78,136 @@
 
         #dist-val { 
             font-size: 5rem; 
-            font-weight:
+            font-weight: 100;
+            font-family: 'Courier New', monospace; /* Aspect tech */
+            line-height: 1;
+            transition: color 0.5s ease;
+        }
+
+        .unit { font-size: 1.5rem; color: #444; margin-left: 5px; }
+
+        /* Status Pill */
+        #status-msg { 
+            display: inline-block;
+            font-size: 0.8rem; 
+            font-weight: 600; 
+            padding: 8px 20px;
+            border-radius: 50px;
+            background: rgba(255,255,255,0.05);
+            letter-spacing: 1px;
+            transition: all 0.5s ease;
+        }
+
+        /* Culori Dinamice */
+        .color-safe { color: var(--accent-green); border: 1px solid rgba(0,255,136,0.2); box-shadow: 0 0 15px rgba(0,255,136,0.05); }
+        .color-danger { color: var(--accent-red); border: 1px solid rgba(255,62,62,0.2); box-shadow: 0 0 20px rgba(255,62,62,0.1); }
+        .color-neutral { color: var(--accent-blue); border: 1px solid rgba(0,210,255,0.2); }
+
+        /* Secțiunea Buton */
+        .footer {
+            margin-top: 40px;
+            padding-top: 25px;
+            border-top: 1px solid var(--border-color);
+        }
+
+        #last-time {
+            font-family: monospace;
+            font-size: 1.2rem;
+            color: #fff;
+            opacity: 0.9;
+        }
+
+        .pulse {
+            animation: pulse-animation 1s ease-out;
+        }
+
+        @keyframes pulse-animation {
+            0% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.05); opacity: 0.7; color: var(--accent-red); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="live-clock">00:00:00</div>
+
+    <h1>Echo Console</h1>
+
+    <div class="main-container">
+        <div class="dist-container">
+            <div class="label">Radar Distance</div>
+            <div id="dist-val" class="color-neutral">--</div>
+            <span class="unit">CM</span>
+        </div>
+        
+        <div id="status-msg" class="color-neutral">WAITING FOR DATA</div>
+
+        <div class="footer">
+            <div class="label">Last Button Interaction</div>
+            <div id="last-time">--:--:--</div>
+        </div>
+    </div>
+
+    <script>
+        // CONFIGURARE FIREBASE
+        const firebaseConfig = {
+            databaseURL: "https://echo-bd4aa-default-rtdb.europe-west1.firebasedatabase.app"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // 1. Ora Live (Discretă)
+        function updateClock() {
+            const now = new Date();
+            const timeString = now.toLocaleTimeString('ro-RO', { hour12: false });
+            document.getElementById('live-clock').innerText = timeString;
+        }
+        setInterval(updateClock, 1000);
+        updateClock();
+
+        const distEl = document.getElementById('dist-val');
+        const statusEl = document.getElementById('status-msg');
+        const timeEl = document.getElementById('last-time');
+
+        let isFirstLoad = true;
+
+        // 2. Ascultare Distanță
+        db.ref('sistem').on('value', (snap) => {
+            const data = snap.val();
+            if (data) {
+                const d = data.distanta;
+                distEl.innerText = d;
+
+                if (d <= 10) {
+                    distEl.style.color = "var(--accent-red)";
+                    statusEl.innerText = "CRITICAL PROXIMITY";
+                    statusEl.className = "color-danger";
+                } else {
+                    distEl.style.color = "var(--accent-green)";
+                    statusEl.innerText = "SYSTEM SECURE";
+                    statusEl.className = "color-safe";
+                }
+            }
+        });
+
+        // 3. Ascultare Buton (Anti-Refresh inclus)
+        db.ref('trigger_buton').on('value', (snap) => {
+            if (isFirstLoad) {
+                isFirstLoad = false;
+                return;
+            }
+
+            if (snap.val()) {
+                const now = new Date();
+                timeEl.innerText = now.toLocaleTimeString('ro-RO', { hour12: false });
+                
+                // Efect vizual
+                timeEl.classList.remove('pulse');
+                void timeEl.offsetWidth; // Reset animație
+                timeEl.classList.add('pulse');
+            }
+        });
+    </script>
+</body>
+</html>
