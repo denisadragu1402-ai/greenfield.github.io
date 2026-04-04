@@ -2,60 +2,70 @@
 <html lang="ro">
 <head>
     <meta charset="UTF-8">
-    <title>ECHO RT - Dashboard</title>
+    <title>ECHO RT - Command Center</title>
     <style>
         :root {
             --bg: #020617; --card: #0f172a; --cyan: #00f2ff;
             --green: #22c55e; --orange: #f59e0b; --red: #ef4444;
             --text: #f8fafc; --subtext: #64748b;
         }
-        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 30px; margin: 0; }
-        .header { text-align: center; margin-bottom: 30px; }
+        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 30px; }
         .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; max-width: 800px; }
-        .card { background: var(--card); border: 1px solid #1e293b; padding: 30px; border-radius: 20px; text-align: center; }
+        .card { background: var(--card); border: 1px solid #1e293b; padding: 30px; border-radius: 20px; text-align: center; position: relative; }
         .full-width { grid-column: 1 / span 2; }
         .label { color: var(--subtext); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 2px; }
         .value { font-size: 3.5rem; font-weight: 800; display: block; margin: 10px 0; }
-        .status-text { font-weight: bold; font-size: 1.2rem; margin-bottom: 5px; }
-        .time-box { font-family: 'Courier New', monospace; color: var(--cyan); font-size: 1.4rem; border: 1px solid rgba(0,242,255,0.2); padding: 10px; border-radius: 8px; background: rgba(0,0,0,0.2); }
-        .radar-active { color: var(--green); }
-        .radar-inactive { color: var(--red); }
-        .st-pericol { color: var(--red); animation: pulse 1s infinite; }
-        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+        .time-box { font-family: 'Courier New', monospace; color: var(--cyan); font-size: 1.6rem; margin-top: 10px; display: block; }
+        .status-radar { position: absolute; top: 15px; right: 20px; font-size: 0.7rem; font-weight: bold; }
+        .online { color: var(--green); }
+        .offline { color: var(--red); }
     </style>
 </head>
 <body>
 
-    <div class="header">
-        <h1 style="color: var(--cyan); letter-spacing: 5px;">ECHO <span style="color:white">RT RADAR</span></h1>
-        <div id="live-clock" style="color: var(--subtext); font-family: monospace;">--:--:--</div>
-    </div>
+    <h1 style="color: var(--cyan); letter-spacing: 5px; margin-bottom: 30px;">ECHO <span style="color:white">RT MONITOR</span></h1>
 
     <div class="dashboard">
         <div class="card full-width">
-            <span class="label">Status Monitorizare</span>
-            <div id="radar-status" class="status-text radar-inactive">VERIFICARE...</div>
-            <div class="label" style="margin-top: 15px;">Ultima recepție de la server (Fixă):</div>
-            <div id="last-server-time" class="time-box">Așteptare date...</div>
+            <span class="label">Ultima Apăsare Buton (Server Time)</span>
+            <span id="btn-timestamp" class="time-box">Se încarcă...</span>
+            <small style="color: var(--subtext)">Această oră este stocată permanent în Cloud</small>
         </div>
 
         <div class="card">
-            <span class="label">Distanță Detectată</span>
+            <div id="radar-light" class="status-radar offline">● DECONECTAT</div>
+            <span class="label">Distanță Live</span>
             <span id="dist-val" class="value">-- cm</span>
         </div>
 
         <div class="card">
-            <span class="label">Stare Alertă</span>
+            <span class="label">Stare Sistem</span>
             <span id="status-val" class="value" style="font-size: 1.8rem;">---</span>
         </div>
     </div>
 
     <script>
-        // DATELE TALE DE LA THINGSPEAK
-        const channelID = "2161747"; // Pune ID-ul tau aici (ex: 2161747)
-        const readKey = "YOUR_READ_KEY"; // Pune Read API Key aici
+        const channelID = "2161747"; // Pune ID-ul tau
+        const readKey = "YOUR_READ_KEY";    // Pune Read API Key-ul tau
 
-        function fetchData() {
+        // 1. Functie pentru ORA FIXA a butonului (Persistenta)
+        function fetchLastButtonPress() {
+            // Cerem ultima intrare din Field 2 care a avut valoarea 1
+            const url = `https://api.thingspeak.com/channels/${channelID}/fields/2/last.json?api_key=${readKey}`;
+
+            fetch(url)
+                .then(res => res.json())
+                .then(data => {
+                    if (data.created_at) {
+                        const dataServer = new Date(data.created_at);
+                        document.getElementById('btn-timestamp').innerText = dataServer.toLocaleTimeString('ro-RO');
+                    }
+                })
+                .catch(err => console.error("Eroare Buton:", err));
+        }
+
+        // 2. Functie pentru DATE LIVE (Distanta + Radar Status)
+        function fetchLiveRadar() {
             const url = `https://api.thingspeak.com/channels/${channelID}/feeds.json?api_key=${readKey}&results=1`;
 
             fetch(url)
@@ -64,47 +74,42 @@
                     const feed = data.feeds[0];
                     if (!feed) return;
 
+                    // Update Distanta
                     const dist = parseInt(feed.field1);
-                    const serverTimestamp = feed.created_at; // ORA SERVERULUI (PERMANENTA)
-                    
-                    // 1. Afisare Distanta si Analiza
-                    const dv = document.getElementById('dist-val');
+                    document.getElementById('dist-val').innerText = dist + " cm";
+
+                    // Update Status Vizual
                     const sv = document.getElementById('status-val');
-                    dv.innerText = dist + " cm";
+                    if (dist <= 10 && dist > 0) { sv.innerText = "PERICOL"; sv.style.color = "var(--red)"; }
+                    else if (dist > 10 && dist <= 100) { sv.innerText = "OBSTACOL"; sv.style.color = "var(--orange)"; }
+                    else { sv.innerText = "SIGURANȚĂ"; sv.style.color = "var(--green)"; }
 
-                    if (dist <= 10 && dist > 0) { sv.innerText = "PERICOL"; sv.className = "value st-pericol"; dv.className = "value st-pericol"; }
-                    else if (dist > 10 && dist <= 100) { sv.innerText = "OBSTACOL"; sv.className = "value st-obstacol"; dv.className = "value st-obstacol"; }
-                    else { sv.innerText = "LIBER"; sv.className = "value"; dv.className = "value"; }
-
-                    // 2. Prelucrare ORA SERVER (Nu se schimba la refresh)
-                    const dataServer = new Date(serverTimestamp);
-                    const oraFormatata = dataServer.toLocaleTimeString('ro-RO');
-                    document.getElementById('last-server-time').innerText = oraFormatata;
-
-                    // 3. Logica Radar ACTIV/INACTIV (Watchdog)
+                    // Watchdog (Radar Online/Offline)
+                    const ultimaSincronizare = new Date(feed.created_at);
                     const acum = new Date();
-                    const secundeTrecute = (acum - dataServer) / 1000;
-
-                    const statusTxt = document.getElementById('radar-status');
-                    if (secundeTrecute < 45) { // Daca ultimele date sunt mai noi de 45 sec
-                        statusTxt.innerText = "● RADAR ONLINE";
-                        statusTxt.className = "status-text radar-active";
+                    const radarLight = document.getElementById('radar-light');
+                    
+                    if ((acum - ultimaSincronizare) / 1000 < 40) {
+                        radarLight.innerText = "● RADAR ONLINE";
+                        radarLight.className = "status-radar online";
                     } else {
-                        statusTxt.innerText = "○ RADAR OFFLINE (INACTIV)";
-                        statusTxt.className = "status-text radar-inactive";
+                        radarLight.innerText = "● RADAR OFFLINE";
+                        radarLight.className = "status-radar offline";
                     }
-                })
-                .catch(err => console.log("Eroare: ", err));
+
+                    // Daca field2 a fost 1 in aceasta citire, actualizam si ora butonului imediat
+                    if (feed.field2 == "1") {
+                        fetchLastButtonPress();
+                    }
+                });
         }
 
-        // Update la 5 secunde
-        setInterval(fetchData, 5000);
-        fetchData();
+        // Pornire si intervale
+        fetchLastButtonPress(); // O citim imediat la refresh
+        fetchLiveRadar();
 
-        // Ceas Live (ora curenta a calculatorului)
-        setInterval(() => {
-            document.getElementById('live-clock').innerText = "ORA LOCALĂ: " + new Date().toLocaleTimeString('ro-RO');
-        }, 1000);
+        setInterval(fetchLiveRadar, 5000); // Radarul se actualizeaza des
+        setInterval(fetchLastButtonPress, 15000); // Verificam butonul mai rar (sau la detectie field2)
     </script>
 </body>
 </html>
