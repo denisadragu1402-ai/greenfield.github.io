@@ -2,114 +2,78 @@
 <html lang="ro">
 <head>
     <meta charset="UTF-8">
-    <title>ECHO RT - Command Center</title>
+    <title>ECHO RT - Firebase Command Center</title>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     <style>
-        :root {
-            --bg: #020617; --card: #0f172a; --cyan: #00f2ff;
-            --green: #22c55e; --orange: #f59e0b; --red: #ef4444;
-            --text: #f8fafc; --subtext: #64748b;
-        }
-        body { background: var(--bg); color: var(--text); font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 30px; }
-        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; max-width: 800px; }
-        .card { background: var(--card); border: 1px solid #1e293b; padding: 30px; border-radius: 20px; text-align: center; position: relative; }
-        .full-width { grid-column: 1 / span 2; }
-        .label { color: var(--subtext); text-transform: uppercase; font-size: 0.7rem; letter-spacing: 2px; }
-        .value { font-size: 3.5rem; font-weight: 800; display: block; margin: 10px 0; }
-        .time-box { font-family: 'Courier New', monospace; color: var(--cyan); font-size: 1.6rem; margin-top: 10px; display: block; }
-        .status-radar { position: absolute; top: 15px; right: 20px; font-size: 0.7rem; font-weight: bold; }
-        .online { color: var(--green); }
-        .offline { color: var(--red); }
+        :root { --bg: #020617; --card: #0f172a; --cyan: #00f2ff; --text: #f8fafc; }
+        body { background: var(--bg); color: var(--text); font-family: sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+        .dashboard { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; width: 100%; max-width: 700px; }
+        .card { background: var(--card); padding: 25px; border-radius: 15px; border: 1px solid #1e293b; text-align: center; }
+        .full { grid-column: 1 / span 2; }
+        .val { font-size: 3rem; font-weight: bold; color: var(--cyan); display: block; }
+        .time { font-family: monospace; font-size: 1.5rem; color: #64748b; }
     </style>
 </head>
 <body>
 
-    <h1 style="color: var(--cyan); letter-spacing: 5px; margin-bottom: 30px;">ECHO <span style="color:white">RT MONITOR</span></h1>
+    <h1 style="color: var(--cyan)">ECHO RT <span style="color:white">MONITOR</span></h1>
 
     <div class="dashboard">
-        <div class="card full-width">
-            <span class="label">Ultima Apăsare Buton (Server Time)</span>
-            <span id="btn-timestamp" class="time-box">Se încarcă...</span>
-            <small style="color: var(--subtext)">Această oră este stocată permanent în Cloud</small>
+        <div class="card full">
+            <div style="text-transform: uppercase; font-size: 0.8rem; color: #64748b;">Ultima Apăsare Buton (Fixă în DB)</div>
+            <div id="display-ora" class="val">--:--:--</div>
+            <div id="radar-status" style="margin-top:10px; font-weight:bold;">Sincronizare...</div>
         </div>
 
         <div class="card">
-            <div id="radar-light" class="status-radar offline">● DECONECTAT</div>
-            <span class="label">Distanță Live</span>
-            <span id="dist-val" class="value">-- cm</span>
+            <div style="text-transform: uppercase; font-size: 0.8rem; color: #64748b;">Distanță</div>
+            <div id="display-dist" class="val">-- cm</div>
         </div>
 
         <div class="card">
-            <span class="label">Stare Sistem</span>
-            <span id="status-val" class="value" style="font-size: 1.8rem;">---</span>
+            <div style="text-transform: uppercase; font-size: 0.8rem; color: #64748b;">Status</div>
+            <div id="display-alert" class="val" style="font-size: 1.5rem;">---</div>
         </div>
     </div>
 
     <script>
-        const channelID = "2161747"; // Pune ID-ul tau
-        const readKey = "YOUR_READ_KEY";    // Pune Read API Key-ul tau
+        // Configurația ta din poza
+        const firebaseConfig = { databaseURL: "https://echo-bd4aa-default-rtdb.europe-west1.firebasedatabase.app/" };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-        // 1. Functie pentru ORA FIXA a butonului (Persistenta)
-        function fetchLastButtonPress() {
-            // Cerem ultima intrare din Field 2 care a avut valoarea 1
-            const url = `https://api.thingspeak.com/channels/${channelID}/fields/2/last.json?api_key=${readKey}`;
+        // 1. Citim Distanța Live
+        db.ref('sistem/distanta').on('value', (s) => {
+            const d = s.val();
+            document.getElementById('display-dist').innerText = d + " cm";
+            
+            const alert = document.getElementById('display-alert');
+            if(d > 0 && d <= 10) { alert.innerText = "PERICOL"; alert.style.color = "#ef4444"; }
+            else { alert.innerText = "OK"; alert.style.color = "#22c55e"; }
+            
+            // Watchdog (Radar activ)
+            document.getElementById('radar-status').innerText = "● RADAR ONLINE";
+            document.getElementById('radar-status').style.color = "#22c55e";
+        });
 
-            fetch(url)
-                .then(res => res.json())
-                .then(data => {
-                    if (data.created_at) {
-                        const dataServer = new Date(data.created_at);
-                        document.getElementById('btn-timestamp').innerText = dataServer.toLocaleTimeString('ro-RO');
-                    }
-                })
-                .catch(err => console.error("Eroare Buton:", err));
-        }
+        // 2. ORA FIXĂ (Persistența)
+        // Citim cheia "ultima_ora" din poza ta
+        db.ref('ultima_ora').on('value', (s) => {
+            const t = s.val();
+            if(!t) return;
 
-        // 2. Functie pentru DATE LIVE (Distanta + Radar Status)
-        function fetchLiveRadar() {
-            const url = `https://api.thingspeak.com/channels/${channelID}/feeds.json?api_key=${readKey}&results=1`;
-
-            fetch(url)
-                .then(res => res.json())
-                .then(data => {
-                    const feed = data.feeds[0];
-                    if (!feed) return;
-
-                    // Update Distanta
-                    const dist = parseInt(feed.field1);
-                    document.getElementById('dist-val').innerText = dist + " cm";
-
-                    // Update Status Vizual
-                    const sv = document.getElementById('status-val');
-                    if (dist <= 10 && dist > 0) { sv.innerText = "PERICOL"; sv.style.color = "var(--red)"; }
-                    else if (dist > 10 && dist <= 100) { sv.innerText = "OBSTACOL"; sv.style.color = "var(--orange)"; }
-                    else { sv.innerText = "SIGURANȚĂ"; sv.style.color = "var(--green)"; }
-
-                    // Watchdog (Radar Online/Offline)
-                    const ultimaSincronizare = new Date(feed.created_at);
-                    const acum = new Date();
-                    const radarLight = document.getElementById('radar-light');
-                    
-                    if ((acum - ultimaSincronizare) / 1000 < 40) {
-                        radarLight.innerText = "● RADAR ONLINE";
-                        radarLight.className = "status-radar online";
-                    } else {
-                        radarLight.innerText = "● RADAR OFFLINE";
-                        radarLight.className = "status-radar offline";
-                    }
-
-                    // Daca field2 a fost 1 in aceasta citire, actualizam si ora butonului imediat
-                    if (feed.field2 == "1") {
-                        fetchLastButtonPress();
-                    }
-                });
-        }
-
-        // Pornire si intervale
-        fetchLastButtonPress(); // O citim imediat la refresh
-        fetchLiveRadar();
-
-        setInterval(fetchLiveRadar, 5000); // Radarul se actualizeaza des
-        setInterval(fetchLastButtonPress, 15000); // Verificam butonul mai rar (sau la detectie field2)
+            let dataObiect;
+            // Daca in Firebase e text (ca in poza "03:31"), il afisam direct
+            if(typeof t === "string") {
+                document.getElementById('display-ora').innerText = t;
+            } 
+            // Daca e timestamp (numar), il convertim frumos
+            else {
+                dataObiect = new Date(t);
+                document.getElementById('display-ora').innerText = dataObiect.toLocaleTimeString('ro-RO');
+            }
+        });
     </script>
 </body>
 </html>
