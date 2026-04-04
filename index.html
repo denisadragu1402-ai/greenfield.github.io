@@ -1,3 +1,4 @@
+Index.html (Varianta Restaurată și Optimizată)
 <!DOCTYPE html>
 <html lang="ro">
 <head>
@@ -8,85 +9,128 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
     
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #121212; color: white; text-align: center; }
-        .container { margin-top: 50px; }
-        .card { background: #1e1e1e; padding: 20px; border-radius: 15px; display: inline-block; min-width: 250px; margin: 10px; border: 1px solid #333; }
-        .live-clock { color: #00ff88; font-size: 1.5em; font-weight: bold; }
-        .last-press { color: #ff3e3e; font-size: 1.2em; }
-        .distanta { font-size: 3em; color: #00d4ff; }
-        .status { padding: 10px; border-radius: 5px; margin-top: 10px; display: inline-block; }
-        .active { background: #ff3e3e; animation: blink 1s infinite; }
-        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.5; } 100% { opacity: 1; } }
+        body { 
+            font-family: 'Arial', sans-serif; 
+            background-color: #0f0f0f; 
+            color: white; 
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+        }
+
+        /* Ora live - discretă, în colț */
+        #live-clock {
+            position: fixed;
+            top: 15px;
+            right: 20px;
+            font-size: 0.9em;
+            color: #555; /* Gri închis, să nu bată la ochi */
+            font-weight: normal;
+        }
+
+        h1 { margin-bottom: 30px; letter-spacing: 2px; color: #eee; }
+
+        .dashboard {
+            background: #1a1a1a;
+            padding: 30px;
+            border-radius: 20px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center;
+            width: 320px;
+        }
+
+        .label { font-size: 0.8em; color: #888; text-transform: uppercase; margin-bottom: 5px; }
+        
+        /* Valori dinamice */
+        .value { font-size: 3.5em; font-weight: bold; margin-bottom: 20px; transition: 0.3s; }
+        .status-text { font-size: 1.5em; font-weight: bold; margin-top: 10px; }
+
+        /* Culori mesaje */
+        .safe { color: #2ecc71; }    /* Verde */
+        .danger { color: #e74c3c; }  /* Roșu */
+        .neutral { color: #3498db; } /* Albastru */
+
+        .last-press {
+            margin-top: 25px;
+            padding-top: 15px;
+            border-top: 1px solid #333;
+            font-size: 0.9em;
+            color: #aaa;
+        }
     </style>
 </head>
 <body>
 
-    <div class="container">
-        <h1>PROIECT ECHO</h1>
+    <div id="live-clock">00:00:00</div>
 
-        <div class="card">
-            <p>ORA LIVE</p>
-            <div id="clock" class="live-clock">00:00:00</div>
-        </div>
+    <h1>ECHO SYSTEM</h1>
 
-        <div class="card">
-            <p>DISTANȚĂ SENZOR</p>
-            <div id="dist" class="distanta">0</div>
-            <p>cm</p>
-        </div>
+    <div class="dashboard">
+        <div class="label">Distanță curentă</div>
+        <div id="dist-val" class="value neutral">0</div>
+        
+        <div class="label">Status Sistem</div>
+        <div id="status-msg" class="status-text safe">SISTEM OK</div>
 
-        <div class="card">
-            <p>ULTIMA ACTIVARE BUTON</p>
-            <div id="lastTime" class="last-press">--:--:--</div>
-            <div id="btnStatus" class="status">AȘTEPTARE...</div>
+        <div class="last-press">
+            Ultima apăsare buton:<br>
+            <span id="last-time" style="color: #eee;">--:--:--</span>
         </div>
     </div>
 
     <script>
-        // CONFIGURARE FIREBASE (Pune datele tale aici!)
+        // CONFIGURARE FIREBASE
         const firebaseConfig = {
             databaseURL: "https://echo-bd4aa-default-rtdb.europe-west1.firebasedatabase.app"
         };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        // 1. FUNCȚIE ORA LIVE
+        // 1. Ora Live (Discretă)
         function updateClock() {
             const now = new Date();
-            const timeString = now.toLocaleTimeString('ro-RO');
-            document.getElementById('clock').innerText = timeString;
+            document.getElementById('live-clock').innerText = now.toLocaleTimeString('ro-RO');
         }
-        setInterval(updateClock, 1000); // Update la fiecare secundă
+        setInterval(updateClock, 1000);
 
-        // 2. ASCULTARE DATE DIN FIREBASE
-        
-        // Ascultăm distanța
+        // 2. Ascultare Date Firebase
+        const distElement = document.getElementById('dist-val');
+        const statusElement = document.getElementById('status-msg');
+        const lastTimeElement = document.getElementById('last-time');
+
+        // Monitorizare Distanță și Status
         db.ref('sistem').on('value', (snapshot) => {
             const data = snapshot.val();
-            if(data) {
-                document.getElementById('dist').innerText = data.distanta;
+            if (data) {
+                const d = data.distanta;
+                distElement.innerText = d + " cm";
+
+                if (d <= 10) {
+                    distElement.className = "value danger";
+                    statusElement.innerText = "PERICOL: OBIECT APROAPE!";
+                    statusElement.className = "status-text danger";
+                } else {
+                    distElement.className = "value safe";
+                    statusElement.innerText = "SISTEM OK";
+                    statusElement.className = "status-text safe";
+                }
             }
         });
 
-        // Ascultăm trigger-ul de buton
+        // Monitorizare Buton (Update la apăsare)
         db.ref('trigger_buton').on('value', (snapshot) => {
             const val = snapshot.val();
-            if(val) {
-                // Când valoarea se schimbă, înseamnă că butonul a fost apăsat
+            if (val) {
+                // Generăm ora în momentul în care primim semnalul de la Arduino
                 const now = new Date();
-                const oraApasare = now.toLocaleTimeString('ro-RO');
+                lastTimeElement.innerText = now.toLocaleTimeString('ro-RO');
                 
-                document.getElementById('lastTime').innerText = oraApasare;
-                
-                // Efect vizual de alertă
-                const statusDiv = document.getElementById('btnStatus');
-                statusDiv.innerText = "BUTON APĂSAT!";
-                statusDiv.className = "status active";
-                
-                setTimeout(() => {
-                    statusDiv.className = "status";
-                    statusDiv.innerText = "OK";
-                }, 3000); // Revine la normal după 3 secunde
+                // Efect vizual temporar (opțional)
+                lastTimeElement.style.color = "#e74c3c";
+                setTimeout(() => { lastTimeElement.style.color = "#eee"; }, 2000);
             }
         });
     </script>
