@@ -46,4 +46,104 @@
             font-family: 'Courier New', monospace;
             color: var(--subtext); font-size: 1.1rem;
             background: rgba(15, 23, 42, 0.8);
-            padding: 5px 15px; border-radius: 8
+            padding: 5px 15px; border-radius: 8px;
+            border: 1px solid rgba(255,255,255,0.05);
+            pointer-events: none;
+        }
+
+        @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
+    </style>
+</head>
+<body>
+
+    <div class="header">
+        <h1 style="color: var(--cyan); letter-spacing: 10px; margin: 0; font-size: 2.5rem;">ECHO <span style="color:white">RT</span></h1>
+        <p style="color: var(--subtext); font-size: 0.9rem;">MONITORIZARE RADAR FIREBASE</p>
+    </div>
+
+    <div class="dashboard">
+        <div class="card full-width">
+            <span class="label">Ultimul eveniment detectat (Server Time)</span>
+            <span id="display-ora" style="font-family: monospace; font-size: 2rem; color: var(--cyan);">--:--:--</span>
+        </div>
+
+        <div class="card">
+            <span class="label">Distanță</span>
+            <span id="display-dist" class="value">-- cm</span>
+        </div>
+
+        <div class="card">
+            <span class="label">Analiză Status</span>
+            <span id="display-status" class="value" style="font-size: 1.8rem;">---</span>
+        </div>
+    </div>
+
+    <div id="live-clock" class="live-clock-fixed">00:00:00</div>
+
+    <script>
+        // 1. CONFIGURARE FIREBASE
+        const firebaseConfig = { databaseURL: "https://echo-bd4aa-default-rtdb.europe-west1.firebasedatabase.app/" };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        // 2. CEAS LIVE (DREAPTA JOS)
+        function updateLiveClock() {
+            const now = new Date();
+            document.getElementById('live-clock').innerText = now.toLocaleTimeString('ro-RO');
+        }
+        setInterval(updateLiveClock, 1000);
+        updateLiveClock();
+
+        // 3. LOGICA DATE RADAR (Statusul cerut)
+        db.ref('sistem/distanta').on('value', (snapshot) => {
+            const d = snapshot.val();
+            if (d === null) return;
+
+            const distEl = document.getElementById('display-dist');
+            const statusEl = document.getElementById('display-status');
+
+            distEl.innerText = d + " cm";
+
+            // Noua Logica de Status:
+            // Pericol < 10 | Obstacol < 50 | Siguranta > 50
+            if (d > 0 && d < 10) {
+                statusEl.innerText = "PERICOL";
+                statusEl.className = "value st-pericol";
+                distEl.className = "value st-pericol";
+            } 
+            else if (d >= 10 && d < 50) {
+                statusEl.innerText = "OBSTACOL";
+                statusEl.className = "value st-obstacol";
+                distEl.className = "value st-obstacol";
+            } 
+            else if (d >= 50) {
+                statusEl.innerText = "SIGURANȚĂ";
+                statusEl.className = "value st-siguranta";
+                distEl.className = "value st-siguranta";
+            }
+            else {
+                statusEl.innerText = "STANDBY";
+                statusEl.className = "value";
+                distEl.className = "value";
+            }
+        });
+
+        // 4. ORA FIXĂ DIN BAZA DE DATE (Pentru persistenta la refresh)
+        db.ref('ultima_ora').on('value', (snapshot) => {
+            const t = snapshot.val();
+            if(!t) return;
+
+            const displayOra = document.getElementById('display-ora');
+            
+            // Daca este timestamp numeric (de la .sv: timestamp)
+            if (typeof t === "number") {
+                displayOra.innerText = new Date(t).toLocaleTimeString('ro-RO');
+            } 
+            // Daca este string (ex: "03:31")
+            else {
+                displayOra.innerText = t;
+            }
+        });
+    </script>
+</body>
+</html>
