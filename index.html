@@ -10,6 +10,7 @@
         :root {
             --bg-dark: #0d0612; --card-bg: #1a0f26;
             --neon-purple: #b050ff; --neon-pink: #ff00ff; 
+            --neon-orange: #ff9d00; /* Culoare noua pentru obstacole */
             --text-gray: #8e6b9c; --text-light: #d0a0ff;
         }
         body { 
@@ -21,27 +22,37 @@
             background: var(--card-bg); padding: 35px; border-radius: 25px;
             border: 1px solid var(--neon-purple); text-align: center; width: 350px;
             box-shadow: 0 0 20px rgba(176, 80, 255, 0.2);
+            transition: border-color 0.3s, box-shadow 0.3s;
         }
-        .value { font-size: 3.5em; font-weight: 900; color: var(--neon-purple); margin: 15px 0; }
+        .value { font-size: 3.5em; font-weight: 900; color: var(--neon-purple); margin: 5px 0; transition: color 0.3s; }
+        
+        /* Stil nou pentru mesajul de distanta */
+        .msg-distanta { font-size: 1.1em; font-weight: bold; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; transition: color 0.3s; }
+        
         .btn-ham {
             background: transparent; border: 2px solid var(--neon-pink); color: var(--neon-pink);
             padding: 12px 25px; border-radius: 50px; cursor: pointer; font-weight: bold;
-            text-transform: uppercase; transition: 0.3s; margin: 20px 0;
+            text-transform: uppercase; transition: 0.3s; margin: 10px 0 20px 0;
         }
         .btn-ham:hover { background: var(--neon-pink); color: white; box-shadow: 0 0 15px var(--neon-pink); }
         .footer-tech {
             position: fixed; bottom: 20px; font-size: 0.7em; color: var(--text-gray);
             display: flex; gap: 15px; text-transform: uppercase;
         }
-        .active-btn { color: var(--neon-pink) !important; animation: pulse 0.5s infinite; font-weight: bold; }
+        .active-btn { color: var(--neon-pink) !important; font-weight: bold; }
+        
+        /* Animatii */
+        .alert-pulse { animation: pulse 0.5s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
     </style>
 </head>
 <body>
     <h1>ECHO SYSTEM</h1>
-    <div class="dashboard">
-        <div style="font-size: 0.7em; color: var(--text-gray);">DISTANȚĂ</div>
+    <div class="dashboard" id="main-card">
+        <div style="font-size: 0.7em; color: var(--text-gray);">DISTANȚĂ SENZOR</div>
         <div id="dist-val" class="value">-- cm</div>
+        
+        <div id="dist-msg" class="msg-distanta">AȘTEPTARE DATE...</div>
         
         <button class="btn-ham" onclick="triggerHam()">Comandă: HAM HAM</button>
 
@@ -52,11 +63,10 @@
     </div>
 
     <div class="footer-tech">
-        <span id="net-status">Offline</span> | <span id="live-clock">00:00:00</span> | <span>v1.3</span>
+        <span id="net-status">Offline</span> | <span id="live-clock">00:00:00</span> | <span>v1.4</span>
     </div>
 
     <script>
-        // CONFIGURARE (Asigură-te că URL-ul e exact acesta)
         const firebaseConfig = { databaseURL: "https://echo-bd4aa-default-rtdb.europe-west1.firebasedatabase.app" };
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
@@ -64,17 +74,54 @@
         // Ceas Live
         setInterval(() => { document.getElementById('live-clock').innerText = new Date().toLocaleTimeString('ro-RO'); }, 1000);
 
-        // 1. ASCULTĂM DISTANȚA (Path: sistem/distanta)
+        // 1. ASCULTĂM DISTANȚA (Logica pentru Mesaje)
         db.ref('sistem/distanta').on('value', (s) => { 
             const d = s.val();
-            const el = document.getElementById('dist-val');
-            el.innerText = d ? d + " cm" : "-- cm";
-            // Se face roz dacă obiectul e sub 15cm
-            el.style.color = d < 15 ? "var(--neon-pink)" : "var(--neon-purple)";
+            const elDist = document.getElementById('dist-val');
+            const elMsg = document.getElementById('dist-msg');
+            const card = document.getElementById('main-card');
+
+            if (d === null || d === 999) {
+                // Nu detecteaza nimic (sau eroare)
+                elDist.innerText = "-- cm";
+                elMsg.innerText = "ZONĂ LIBERĂ (FĂRĂ OBSTACOL)";
+                elDist.style.color = "var(--neon-purple)";
+                elMsg.style.color = "var(--neon-purple)";
+                elMsg.classList.remove("alert-pulse");
+                card.style.borderColor = "var(--neon-purple)";
+                card.style.boxShadow = "0 0 20px rgba(176, 80, 255, 0.2)";
+            } else {
+                elDist.innerText = d + " cm";
+
+                // Praguri de distanta
+                if (d <= 15) {
+                    elMsg.innerText = "PERICOL! COLIZIUNE IMINENTĂ";
+                    elDist.style.color = "var(--neon-pink)";
+                    elMsg.style.color = "var(--neon-pink)";
+                    elMsg.classList.add("alert-pulse"); // Adaugam pulsatie
+                    card.style.borderColor = "var(--neon-pink)";
+                    card.style.boxShadow = "0 0 30px rgba(255, 0, 255, 0.4)";
+                } 
+                else if (d > 15 && d <= 100) {
+                    elMsg.innerText = "AVERTIZARE! OBSTACOL APROPIAT";
+                    elDist.style.color = "var(--neon-orange)";
+                    elMsg.style.color = "var(--neon-orange)";
+                    elMsg.classList.remove("alert-pulse");
+                    card.style.borderColor = "var(--neon-orange)";
+                    card.style.boxShadow = "0 0 20px rgba(255, 157, 0, 0.2)";
+                } 
+                else {
+                    elMsg.innerText = "SIGURANȚĂ. ZONĂ LIBERĂ";
+                    elDist.style.color = "var(--neon-purple)";
+                    elMsg.style.color = "var(--neon-purple)";
+                    elMsg.classList.remove("alert-pulse");
+                    card.style.borderColor = "var(--neon-purple)";
+                    card.style.boxShadow = "0 0 20px rgba(176, 80, 255, 0.2)";
+                }
+            }
         });
 
-        // 2. ASCULTĂM BUTONUL FIZIC (Path: trigger_buton)
-        // Folosim 'value' pentru a vedea când se schimbă numărul în Firebase
+        // 2. ASCULTĂM BUTONUL FIZIC
         let lastValue = null;
         db.ref('trigger_buton').on('value', (s) => {
             const val = s.val();
@@ -83,7 +130,6 @@
             if (lastValue !== null && val !== lastValue) {
                 el.innerText = "APĂSAT!";
                 el.className = "active-btn";
-                // Revine la normal după 1 secundă
                 setTimeout(() => {
                     el.innerText = "INACTIV";
                     el.className = "";
@@ -92,17 +138,21 @@
             lastValue = val;
         });
 
-        // 3. TRIMITEM COMANDA HAM (Path: Comanda_ham)
+        // 3. TRIMITEM COMANDA HAM
         function triggerHam() {
-            console.log("Comandă trimisă...");
             db.ref('Comanda_ham').set(1);
-            // Nu mai dăm set(0) aici, lăsăm placa Arduino să reseteze la 0 după ce aprinde LED-ul
         }
 
-        // Status Conexiune
+        // Status Conexiune Firebase
         db.ref('.info/connected').on('value', (s) => {
-            document.getElementById('net-status').innerText = s.val() ? "Online" : "Offline";
-            document.getElementById('net-status').style.color = s.val() ? "var(--neon-purple)" : "red";
+            const statusEl = document.getElementById('net-status');
+            if(s.val()) {
+                statusEl.innerText = "Online";
+                statusEl.style.color = "var(--neon-purple)";
+            } else {
+                statusEl.innerText = "Offline";
+                statusEl.style.color = "red";
+            }
         });
     </script>
 </body>
