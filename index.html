@@ -3,162 +3,67 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ECHO Dashboard Live</title>
-    
+    <title>ECHO Dashboard v2.1</title>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-    
     <style>
-        :root {
-            --bg-dark: #0d0612; --card-bg: #1a0f26;
-            --neon-purple: #b050ff; --neon-pink: #ff00ff; 
-            --neon-orange: #ff9d00; --text-gray: #8e6b9c; 
-            --text-light: #d0a0ff; --error-red: #ff3333;
-        }
-
-        body { 
-            font-family: 'Segoe UI', sans-serif; background-color: var(--bg-dark); 
-            color: var(--text-light); margin: 0; display: flex;
-            flex-direction: column; align-items: center; justify-content: center; height: 100vh;
-        }
-
-        h1 { letter-spacing: 3px; text-shadow: 0 0 10px rgba(208, 160, 255, 0.3); margin-bottom: 20px; text-align: center;}
-
-        .dashboard {
-            background: var(--card-bg); padding: 40px; border-radius: 25px;
-            border: 2px solid var(--neon-purple); text-align: center; width: 350px;
-            box-shadow: 0 0 25px rgba(176, 80, 255, 0.25);
-            transition: all 0.3s ease;
-        }
-
-        .dist-label { font-size: 0.8em; color: var(--text-gray); letter-spacing: 2px; text-transform: uppercase;}
-        .value { font-size: 4em; font-weight: 900; color: var(--neon-purple); margin: 10px 0; }
-        .msg-distanta { font-size: 0.9em; font-weight: bold; margin-bottom: 30px; text-transform: uppercase; letter-spacing: 1px;}
-
-        .btn-ham {
-            background: transparent; border: 2px solid var(--neon-pink); color: var(--neon-pink);
-            padding: 15px 30px; border-radius: 50px; cursor: pointer; font-weight: bold;
-            letter-spacing: 1px; text-transform: uppercase; transition: all 0.3s; margin-bottom: 30px; width: 100%;
-        }
-        .btn-ham:hover { background: var(--neon-pink); color: white; box-shadow: 0 0 20px var(--neon-pink); transform: scale(1.05);}
-
-        .btn-status-container { border-top: 1px solid #3d2354; padding-top: 20px; }
-        #btn-status { margin-top: 10px; font-size: 1.2em; font-weight: bold; }
-
-        .footer-tech { position: absolute; bottom: 20px; font-size: 0.75em; color: var(--text-gray); display: flex; gap: 20px; text-transform: uppercase; letter-spacing: 1px; }
-
-        .active-btn { color: var(--neon-pink) !important; text-shadow: 0 0 10px var(--neon-pink); }
-        .alert-pulse { animation: pulseWarning 0.5s infinite alternate; }
-        
-        @keyframes pulseWarning { from { opacity: 1; transform: scale(1); } to { opacity: 0.6; transform: scale(1.03); } }
+        :root { --bg: #0d0612; --purp: #b050ff; --pink: #ff00ff; --txt: #d0a0ff; }
+        body { font-family: sans-serif; background: var(--bg); color: var(--txt); display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        .dashboard { background: #1a0f26; padding: 40px; border-radius: 25px; border: 2px solid var(--purp); text-align: center; width: 320px; box-shadow: 0 0 20px rgba(176,80,255,0.3); }
+        .value { font-size: 4em; font-weight: bold; color: var(--purp); margin: 10px 0; }
+        .status-btn { font-size: 1.5em; font-weight: bold; margin-top: 20px; padding: 10px; border-top: 1px solid #331a4d; }
+        .active { color: var(--pink); text-shadow: 0 0 10px var(--pink); animation: blink 0.8s infinite; }
+        @keyframes blink { 50% { opacity: 0.5; } }
     </style>
 </head>
 <body>
-
-    <h1>ECHO SYSTEM</h1>
-    
-    <div class="dashboard" id="main-card">
-        <div class="dist-label">DISTANȚĂ SENZOR</div>
+    <h1>ECHO DASHBOARD</h1>
+    <div class="dashboard">
+        <div style="font-size: 0.8em; color: #8e6b9c;">DISTANȚĂ LIVE</div>
         <div id="dist-val" class="value">-- cm</div>
-        <div id="dist-msg" class="msg-distanta" style="color: var(--neon-purple);">AȘTEPTARE DATE...</div>
-        
-        <button class="btn-ham" onclick="triggerHam()" id="ham-btn">COMANDĂ: HAM HAM (LED)</button>
+        <div id="dist-msg" style="margin-bottom: 20px;">SENZOR ACTIV</div>
 
-        <div class="btn-status-container">
-            <div class="dist-label">STATUS BUTON FIZIC (ROBOT)</div>
+        <div class="status-btn">
+            <div style="font-size: 0.5em; color: #8e6b9c;">BUTON BREADBOARD</div>
             <div id="btn-status">INACTIV</div>
         </div>
     </div>
 
-    <div class="footer-tech">
-        <span id="net-status">Se verifică...</span> | 
-        <span id="live-clock">00:00:00</span>
-    </div>
-
     <script>
         const firebaseConfig = { databaseURL: "https://echo-bd4aa-default-rtdb.europe-west1.firebasedatabase.app" };
-        if (!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+        firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
 
-        setInterval(() => { document.getElementById('live-clock').innerText = new Date().toLocaleTimeString('ro-RO'); }, 1000);
-
-        const elDist = document.getElementById('dist-val');
-        const elMsg = document.getElementById('dist-msg');
-        const card = document.getElementById('main-card');
-
-        // CITIRE DISTANȚĂ
-        db.ref('sistem/distanta').on('value', (snapshot) => { 
-            const dist = snapshot.val();
-            
-            if (dist === null || dist === 999) {
-                elDist.innerText = "-- cm"; 
-                elMsg.innerText = "ZONĂ LIBERĂ (FĂRĂ OBSTACOL)";
-                elDist.style.color = "var(--neon-purple)";
-                elMsg.style.color = "var(--neon-purple)";
-                elMsg.classList.remove("alert-pulse");
-                card.style.borderColor = "var(--neon-purple)";
-                return;
-            }
-
-            elDist.innerText = dist + " cm";
-
-            if (dist <= 15) {
-                elMsg.innerText = "PERICOL! COLIZIUNE IMINENTĂ!";
-                elDist.style.color = "var(--neon-pink)";
-                elMsg.style.color = "var(--neon-pink)";
-                elMsg.classList.add("alert-pulse");
-                card.style.borderColor = "var(--neon-pink)";
-            } else if (dist > 15 && dist <= 100) {
-                elMsg.innerText = "AVERTIZARE! OBSTACOL DETECTAT";
-                elDist.style.color = "var(--neon-orange)";
-                elMsg.style.color = "var(--neon-orange)";
-                elMsg.classList.remove("alert-pulse");
-                card.style.borderColor = "var(--neon-orange)";
+        // 1. AFISARE DISTANTA
+        db.ref('sistem/distanta').on('value', (s) => {
+            const d = s.val();
+            const el = document.getElementById('dist-val');
+            if (d === null || d === 999) {
+                el.innerText = "-- cm";
             } else {
-                elMsg.innerText = "ZONĂ SIGURĂ";
-                elDist.style.color = "var(--neon-purple)";
-                elMsg.style.color = "var(--neon-purple)";
-                elMsg.classList.remove("alert-pulse");
-                card.style.borderColor = "var(--neon-purple)";
+                el.innerText = d + " cm";
+                el.style.color = d < 15 ? "#ff00ff" : "#b050ff";
             }
         });
 
-        // CITIRE BUTON FIZIC 
-        let lastBtnVal = null;
-        db.ref('trigger_buton').on('value', (snapshot) => {
-            const val = snapshot.val();
-            const elStatus = document.getElementById('btn-status');
-            if (lastBtnVal !== null && val !== lastBtnVal) {
-                elStatus.innerText = "APĂSAT!";
-                elStatus.className = "active-btn";
-                setTimeout(() => { elStatus.innerText = "INACTIV"; elStatus.className = ""; }, 1500);
-            }
-            lastBtnVal = val;
-        });
-
-        // TRIMITERE COMANDĂ
-        function triggerHam() {
-            const btn = document.getElementById('ham-btn');
-            btn.innerText = "SE TRIMITE...";
+        // 2. STATUS BUTON (MODIFICAT DURATA LA 5 SECUNDE)
+        let lastVal = null;
+        db.ref('trigger_buton').on('value', (s) => {
+            const val = s.val();
+            const el = document.getElementById('btn-status');
             
-            db.ref('Comanda_ham').set(1)
-                .then(() => {
-                    btn.innerText = "COMANDĂ TRIMISĂ!";
-                    setTimeout(() => { btn.innerText = "COMANDĂ: HAM HAM (LED)"; }, 2500);
-                })
-                .catch((error) => alert("Eroare la trimitere: " + error.message));
-        }
-
-        // STATUS CONEXIUNE
-        db.ref('.info/connected').on('value', (snapshot) => {
-            const statusEl = document.getElementById('net-status');
-            if (snapshot.val() === true) {
-                statusEl.innerText = "Conectat la Firebase";
-                statusEl.style.color = "var(--neon-purple)";
-            } else {
-                statusEl.innerText = "Deconectat";
-                statusEl.style.color = "var(--error-red)";
+            // Daca valoarea s-a schimbat in baza de date
+            if (lastVal !== null && val !== lastVal) {
+                el.innerText = "APĂSAT!";
+                el.className = "active";
+                
+                // --- AICI ESTE MODIFICAREA: 5000ms = 5 secunde ---
+                setTimeout(() => {
+                    el.innerText = "INACTIV";
+                    el.className = "";
+                }, 5000); 
             }
+            lastVal = val;
         });
     </script>
 </body>
